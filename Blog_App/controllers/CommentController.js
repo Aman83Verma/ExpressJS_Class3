@@ -1,4 +1,5 @@
 // Import Models.
+const mongoose = require("mongoose");
 const Post = require("../models/postModel");
 const Comment = require("../models/commentModel");
 
@@ -19,7 +20,7 @@ exports.createComment = async (req, res) => {
                             .populate("comments").exec();
                             // populate the comments array with comment documents
 
-        res.json({
+        res.status(200).json({
             post: updatedPost
         });
     }
@@ -27,6 +28,57 @@ exports.createComment = async (req, res) => {
     catch(error){
         return res.status(500).json({
             error: "Error while creating comments.",
+            message: error.message
+        });
+    }
+};
+
+
+exports.deleteComment = async (req, res) => {
+    try {
+        // Get the comment ID from the URL
+        const { commentId } = req.params;
+
+        // Validate the comment ID
+        if (!commentId || !mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid comment ID."
+            });
+        }
+
+        // Find and delete the comment
+        const deletedComment = await Comment.findByIdAndDelete(commentId);
+
+        // Check whether the comment exists
+        if (!deletedComment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found."
+            });
+        }
+
+        // Remove the deleted comment ID from the Post
+        await Post.findByIdAndUpdate(
+            deletedComment.post,
+            {
+                $pull: {
+                    comments: deletedComment._id
+                }
+            }
+        );
+
+        // Send the response
+        return res.status(200).json({
+            success: true,
+            message: "Comment deleted successfully.",
+            deletedComment: deletedComment
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: "Error while deleting comment.",
             message: error.message
         });
     }
